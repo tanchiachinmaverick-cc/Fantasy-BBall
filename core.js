@@ -77,7 +77,10 @@
   // Some sites show "0.485 (11.2)" (pct + attempts) or "5.2/10.1" (made/attempted).
   function parseShooting(cell) {
     const s = String(cell == null ? '' : cell).trim();
-    let m = s.match(/^(-?\d*\.?\d+)\s*\(\s*(\d*\.?\d+)\s*\)/);
+    // "0.573(10.5/18.3)" = pct (made/attempted)
+    let m = s.match(/^(-?\d*\.?\d+)\s*\(\s*\d*\.?\d+\s*\/\s*(\d*\.?\d+)\s*\)/);
+    if (m) return { pct: pct(parseFloat(m[1])), att: parseFloat(m[2]) };
+    m = s.match(/^(-?\d*\.?\d+)\s*\(\s*(\d*\.?\d+)\s*\)/);
     if (m) return { pct: pct(parseFloat(m[1])), att: parseFloat(m[2]) };
     m = s.match(/^(\d*\.?\d+)\s*\/\s*(\d*\.?\d+)/);
     if (m) {
@@ -91,9 +94,19 @@
   // Returns { players, warnings }.
   function parseProjections(text) {
     const warnings = [];
-    const lines = String(text).split(/\r?\n/).filter((l) => l.trim());
+    let lines = String(text).split(/\r?\n/).filter((l) => l.trim());
     if (lines.length < 2) return { players: [], warnings: ['No data rows found.'] };
     const delim = lines[0].includes('\t') ? '\t' : ',';
+    if (delim === '\t') {
+      // Copying from some sites wraps a row's trailing cells onto their own lines.
+      // A line with 2+ tabs starts a record; tab-free lines continue the previous one.
+      const merged = [];
+      for (const l of lines) {
+        if (merged.length && (l.match(/\t/g) || []).length < 2) merged[merged.length - 1] += '\t' + l.trim();
+        else merged.push(l);
+      }
+      lines = merged;
+    }
     // Find the header row: first line containing a player-name column alias.
     let h = lines.findIndex((l) => splitLine(l, delim).some((c) => ALIASES.name.includes(norm(c))));
     if (h < 0) return { players: [], warnings: ['Could not find a PLAYER column in the header.'] };
@@ -134,6 +147,8 @@
         stl: g('stl') || 0, blk: g('blk') || 0, to: g('to') || 0,
       });
     }
+    if (players.length && players.every((p) => !p.pts && !p.reb && !p.ast))
+      warnings.unshift('ERROR: every stat read as 0 — the columns did not line up. Paste the first rows to the developer.');
     if (estimated)
       warnings.push('FG/FT attempts not found; estimated from points. FG%/FT% values are less accurate — include FGA/FTA columns if you can.');
     return { players, warnings };

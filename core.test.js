@@ -59,3 +59,15 @@ test('recommend excludes nothing it is given and sorts descending', () => {
   assert.strictEqual(recs.length, 5);
   for (let i = 1; i < recs.length; i++) assert.ok(recs[i - 1].score >= recs[i].score);
 });
+
+test('wrapped rows with pct(made/att) cells (Hashtag Basketball copy format)', () => {
+  const txt = 'R#\tPLAYER\tADP\tPOS\tTEAM\tGP\tMPG\tFG%\tFT%\t3PM\tPTS\tTREB\tAST\tSTL\tBLK\tTO\tTOTAL\n' +
+    '1\tNikola Jokic\t1.6\tC\tDEN\t72\t35.1\t0.573(10.5/18.3)\n0.816(5.6/6.8)\n1.8\n28.4\n12.7\n10.4\n1.6\n0.7\n3.5\n15.90\n' +
+    '2\tVictor Wembanyama\t3.2\tC\tSA\t66\t30.4\t0.502(9.2/18.3)\n0.831(5.1/6.1)\n2.2\n25.6\n11.8\n3.6\n1.1\n3.2\n2.9\n14.25';
+  const { players, warnings } = FB.parseProjections(txt);
+  assert.strictEqual(players.length, 2);
+  const j = players[0];
+  assert.deepStrictEqual([j.pos, j.team, j.fgp, j.fga, j.ftp, j.fta, j.tpm, j.pts, j.reb, j.ast, j.stl, j.blk, j.to],
+    ['C', 'DEN', 0.573, 18.3, 0.816, 6.8, 1.8, 28.4, 12.7, 10.4, 1.6, 0.7, 3.5]);
+  assert.strictEqual(warnings.length, 0);
+});
