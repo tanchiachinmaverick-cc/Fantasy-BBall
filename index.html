@@ -2,7 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1216">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Punt Draft">
+<link rel="icon" href="icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>Punt Draft Assistant</title>
 <style>
   :root { --bg:#f6f7f9; --card:#fff; --fg:#1b1f24; --mut:#6a737d; --line:#dfe3e8; --acc:#2456d6; --good:#1a7f37; --bad:#c62828; --mine:#e6f0ff; --taken:#eee; --warnbg:#fff4d6; --warnfg:#5c4400; --errbg:#ffe2e2; --errfg:#7a1414; color-scheme:light; }
@@ -12,7 +20,7 @@
   header { padding:12px 16px; border-bottom:1px solid var(--line); background:var(--card); display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
   h1 { font-size:17px; margin:0 12px 0 0; }
   main { display:grid; grid-template-columns:minmax(0,1.6fr) minmax(320px,1fr); gap:12px; padding:12px; align-items:start; }
-  @media (max-width:900px) { main { grid-template-columns:1fr; } }
+  @media (max-width:900px) { main { grid-template-columns:minmax(0,1fr); } }
   section { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px; }
   h2 { font-size:14px; margin:0 0 8px; }
   button, select, input, textarea { font:inherit; color:inherit; background:var(--card); border:1px solid var(--line); border-radius:6px; padding:5px 9px; }
@@ -35,6 +43,24 @@
   .bar i { display:block; height:8px; border-radius:4px; }
   textarea { width:100%; height:120px; font-family:monospace; font-size:12px; }
   details { margin-bottom:8px; }
+  .cards { display:none; }
+  .card { border:1px solid var(--line); border-radius:8px; padding:8px; margin-bottom:8px; }
+  .card.mine { background:var(--mine); } .card.taken { background:var(--taken); color:var(--mut); }
+  .ch { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:6px; }
+  .ch .nm { flex:1; min-width:120px; } .ck { display:flex; align-items:center; gap:4px; font-size:13px; }
+  .cg { display:grid; grid-template-columns:repeat(5,1fr); gap:4px; }
+  .cc { text-align:center; border:1px solid var(--line); border-radius:6px; padding:2px 0; font-size:13px; }
+  .cc small { display:block; font-size:10px; color:var(--mut); }
+  input[type=checkbox] { width:20px; height:20px; padding:0; }
+  @media (max-width:700px) {
+    body { font-size:15px; padding-bottom:env(safe-area-inset-bottom); }
+    header { padding:calc(8px + env(safe-area-inset-top)) 12px 8px; gap:8px; }
+    main { padding:8px; } main > section:nth-child(2) { order:-1; }
+    button, select, input:not([type=checkbox]), textarea { font-size:16px; padding:8px 10px; }
+    input[type=number] { width:72px; }
+    .tblwrap { display:none; } .cards { display:block; }
+    .rec button { padding:8px 12px; }
+  }
 </style>
 </head>
 <body>
@@ -52,18 +78,20 @@
     <div id="sampleBanner" class="banner" hidden>Showing SYNTHETIC sample players — not real projections. Import real data below.</div>
     <details id="importBox" open>
       <summary><b>Import projections</b></summary>
-      <p class="small mut">On hashtagbasketball.com, open the NBA projections page, select the table and copy it (or export CSV), then paste here. Or set up the one-click <a href="bookmarklet.html" target="_blank">copy-table bookmark</a>. Needs a PLAYER column plus FG%, FT%, 3PM, PTS, REB (TREB), AST, STL, BLK, TO. FGA/FTA columns improve accuracy. The site's exact layout could not be verified when this was built, so check the warnings shown after import.</p>
+      <p class="small mut">On hashtagbasketball.com, open the NBA projections page, select the table and copy it (or export CSV), then paste here. Or set up the one-click <a href="bookmarklet.html" target="_blank">copy-table bookmark</a>. To move everything (projections + picks) to another device, tap <b>Copy backup</b>, send it to yourself (e.g. Notes or Messages), then paste it into the import box on the other device and tap Import. Needs a PLAYER column plus FG%, FT%, 3PM, PTS, REB (TREB), AST, STL, BLK, TO. FGA/FTA columns improve accuracy. The site's exact layout could not be verified when this was built, so check the warnings shown after import.</p>
       <textarea id="paste" placeholder="Paste tab- or comma-separated table here"></textarea>
-      <div class="row"><button id="doImport">Import</button> <input type="file" id="file" accept=".csv,.tsv,.txt"> <button id="doSample">Load synthetic sample</button> <button id="reset">Clear picks</button></div>
+      <div class="row"><button id="doImport">Import</button> <input type="file" id="file" accept=".csv,.tsv,.txt"> <button id="doSample">Load synthetic sample</button> <button id="reset">Clear picks</button> <button id="backup">Copy backup</button></div>
       <div id="warns"></div>
     </details>
     <div class="row">
       <input id="search" placeholder="Search name/team" style="flex:1;min-width:140px">
+      <label>Sort <select id="sortsel"></select></label>
       <label>Pos <select id="posf"><option value="">All</option><option>PG</option><option>SG</option><option>SF</option><option>PF</option><option>C</option></select></label>
       <label><input type="checkbox" id="hideTaken" checked> hide taken</label>
       <label><input type="checkbox" id="hideMine"> hide mine</label>
     </div>
     <div class="tblwrap"><table id="tbl"></table></div>
+    <div class="cards" id="cards"></div>
     <p class="small mut">☑ = on my team · ✗ = taken by someone else. Cell colour always shows strength (green ≥ +1, red ≤ −1 z vs. the top (teams × spots) players); the Build/All columns are z-score sums; FG%/FT% use volume-weighted impact. TO z is inverted (positive = fewer turnovers).</p>
   </section>
   <section>
@@ -86,6 +114,8 @@ try { Object.assign(S, JSON.parse(localStorage.getItem(LS) || '{}')); } catch (e
 const save = () => { try { localStorage.setItem(LS, JSON.stringify(S)); } catch (e) {} };
 
 let players = [], warnings = [], sortKey = 'score', sortDir = -1;
+const mqM = window.matchMedia('(max-width:700px)');
+const CARD_LIMIT = 60;
 
 function synthSample() {
   let seed = 7; const r = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -136,7 +166,15 @@ function render() {
   const head = `<tr><th class="l">Mine</th><th>✗</th><th class="l" data-k="name">Player</th><th class="l">Pos</th><th class="l">Tm</th>` +
     CATS.map((c) => `<th data-k="${c.key}" class="${b.punt.includes(c.key) ? 'punt' : ''}">${c.label}</th>`).join('') +
     `<th data-k="score">Build</th><th data-k="total">All</th></tr>`;
-  $('tbl').innerHTML = head + rows.slice(0, 400).map(({ p, score }) =>
+  const cardRows = mqM.matches ? rows.slice(0, CARD_LIMIT) : [];
+  $('cards').innerHTML = cardRows.map(({ p, score }) =>
+    `<div class="card ${mineSet.has(p.id) ? 'mine' : takenSet.has(p.id) ? 'taken' : ''}"><div class="ch">` +
+    `<label class="ck"><input type="checkbox" data-mine="${esc(p.id)}" ${mineSet.has(p.id) ? 'checked' : ''}>Mine</label>` +
+    `<label class="ck"><input type="checkbox" data-taken="${esc(p.id)}" ${takenSet.has(p.id) ? 'checked' : ''}>Taken</label>` +
+    `<span class="nm"><b>${esc(p.name)}</b> <span class="mut small">${esc(p.pos)} ${esc(p.team)}</span></span><b>${fmt(score)}</b></div>` +
+    `<div class="cg">` + CATS.map((c) => `<div class="cc ${cls(p.z[c.key])} ${b.punt.includes(c.key) ? 'punt' : ''}"><small>${c.label}</small>${cell(p, c.key)}</div>`).join('') + `</div></div>`).join('') +
+    (mqM.matches && rows.length > CARD_LIMIT ? `<p class="small mut">Showing top ${CARD_LIMIT} of ${rows.length}. Use search, position or sort to find others.</p>` : '');
+  $('tbl').innerHTML = mqM.matches ? '' : head + rows.slice(0, 400).map(({ p, score }) =>
     `<tr class="${mineSet.has(p.id) ? 'mine' : takenSet.has(p.id) ? 'taken' : ''}">` +
     `<td class="l"><input type="checkbox" data-mine="${esc(p.id)}" ${mineSet.has(p.id) ? 'checked' : ''}></td>` +
     `<td><input type="checkbox" data-taken="${esc(p.id)}" ${takenSet.has(p.id) ? 'checked' : ''}></td>` +
@@ -179,11 +217,14 @@ document.addEventListener('click', (e) => {
   else if (d.take) { S.taken = toggle(S.taken, d.take, true); }
   else if (d.build) { e.preventDefault(); S.build = d.build; $('build').value = d.build; }
   else if (e.target.tagName === 'TH' && e.target.dataset.k) {
-    const k = e.target.dataset.k; sortDir = sortKey === k ? -sortDir : (k === 'name' ? 1 : -1); sortKey = k; render(); return;
+    const k = e.target.dataset.k; sortDir = sortKey === k ? -sortDir : (k === 'name' ? 1 : -1); sortKey = k; $('sortsel').value = k; render(); return;
   } else return;
   save(); render();
 });
 ['search', 'posf', 'hideTaken', 'hideMine'].forEach((id) => $(id).addEventListener('input', render));
+$('sortsel').innerHTML = [['score', 'Build score'], ['total', 'Overall'], ['name', 'Name'], ...CATS.map((c) => [c.key, c.label])].map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
+$('sortsel').onchange = () => { sortKey = $('sortsel').value; sortDir = sortKey === 'name' ? 1 : -1; render(); };
+mqM.addEventListener && mqM.addEventListener('change', render);
 $('build').innerHTML = BUILDS.map((b) => `<option value="${b.id}">${b.name}</option>`).join('');
 $('build').value = S.build;
 $('view').value = S.view;
@@ -200,13 +241,27 @@ function importText(text, sample) {
   S.text = text; S.sample = sample; S.mine = []; S.taken = []; save(); load(); render();
   if (players.length) $('importBox').open = false;
 }
-$('doImport').onclick = () => importText($('paste').value, false);
+function tryRestore(txt) {
+  try {
+    const o = JSON.parse(txt);
+    if (o && o.fbBackup === 1 && o.state && typeof o.state.text === 'string') { Object.assign(S, o.state); save(); location.reload(); return true; }
+  } catch (e) {}
+  return false;
+}
+$('doImport').onclick = () => { const t = $('paste').value; if (!tryRestore(t)) importText(t, false); };
+$('backup').onclick = async () => {
+  const txt = JSON.stringify({ fbBackup: 1, state: S });
+  try { await navigator.clipboard.writeText(txt); alert('Backup copied. Paste it into the import box on your other device and tap Import.'); }
+  catch (e) { $('importBox').open = true; $('paste').value = txt; $('paste').select(); alert('Could not copy automatically. The backup is in the box — select all and copy it.'); }
+};
 $('file').onchange = async (e) => { if (e.target.files[0]) importText(await e.target.files[0].text(), false); };
 $('doSample').onclick = () => importText(synthSample(), true);
 $('reset').onclick = () => { if (confirm('Clear all picks and taken marks?')) { S.mine = []; S.taken = []; save(); render(); } };
 
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
 if (!S.text) { S.text = synthSample(); S.sample = true; }
 load(); render();
+if (S.text && !S.sample && players.length) $('importBox').open = false;
 </script>
 </body>
 </html>

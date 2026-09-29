@@ -20,3 +20,8 @@ The importer was written without access to the live site's markup, so verify wit
 One-click copy: open `bookmarklet.html` for the setup steps (copies the table from the projections page you are viewing).
 
 Tests: `node --test core.test.js`
+
+## iPhone (home-screen web app)
+Host the repo with GitHub Pages (Settings -> Pages -> deploy from a branch -> choose the branch, folder `/ (root)`),
+open the resulting `https://<user>.github.io/Fantasy-BBall/` in iPhone Safari, then Share -> Add to Home Screen.
+Data is stored per device: use **Copy backup** on one device and paste it into the import box on the other.
