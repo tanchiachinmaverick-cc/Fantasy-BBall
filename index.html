@@ -41,6 +41,7 @@
 <header>
   <h1>Punt Draft Assistant</h1>
   <label>Build <select id="build"></select></label>
+  <label>Show <select id="view"><option value="stat">Actual stats</option><option value="z">Strength (z-score)</option></select></label>
   <label>Teams <input type="number" id="teams" min="4" max="30" value="12"></label>
   <label>Roster spots <input type="number" id="spots" min="5" max="20" value="13"></label>
   <span class="mut small" id="counts"></span>
@@ -62,7 +63,7 @@
       <label><input type="checkbox" id="hideMine"> hide mine</label>
     </div>
     <div class="tblwrap"><table id="tbl"></table></div>
-    <p class="small mut">☑ = on my team · ✗ = taken by someone else. z-scores are vs. the top (teams × spots) players; FG%/FT% use volume-weighted impact. TO z is inverted (positive = fewer turnovers).</p>
+    <p class="small mut">☑ = on my team · ✗ = taken by someone else. Cell colour always shows strength (green ≥ +1, red ≤ −1 z vs. the top (teams × spots) players); the Build/All columns are z-score sums; FG%/FT% use volume-weighted impact. TO z is inverted (positive = fewer turnovers).</p>
   </section>
   <section>
     <h2>My team (<span id="myn">0</span>)</h2>
@@ -79,7 +80,7 @@
 const { CATS, CAT_KEYS, BUILDS, parseProjections, computeZ, rosterTotals, buildScore, recommend, buildFit } = FB;
 const $ = (id) => document.getElementById(id);
 const LS = 'punt-draft-v1';
-let S = { text: '', sample: false, mine: [], taken: [], build: 'balanced', teams: 12, spots: 13 };
+let S = { text: '', sample: false, mine: [], taken: [], build: 'balanced', view: 'stat', teams: 12, spots: 13 };
 try { Object.assign(S, JSON.parse(localStorage.getItem(LS) || '{}')); } catch (e) {}
 const save = () => { try { localStorage.setItem(LS, JSON.stringify(S)); } catch (e) {} };
 
@@ -107,6 +108,9 @@ function load() {
   computeZ(players, S.teams * S.spots);
 }
 
+const statVal = (p, k) => (k === 'fg' ? p.fgp : k === 'ft' ? p.ftp : p[k]);
+const fmtStat = (p, k) => (k === 'fg' || k === 'ft' ? statVal(p, k).toFixed(3).replace(/^0/, '') : statVal(p, k).toFixed(1));
+const cell = (p, k) => (S.view === 'stat' ? fmtStat(p, k) : fmt(p.z[k]));
 const fmt = (z) => (z >= 0 ? '+' : '') + z.toFixed(1);
 const cls = (z) => (z >= 1 ? 'pos' : z <= -1 ? 'neg' : '');
 const build = () => BUILDS.find((b) => b.id === S.build) || BUILDS[0];
@@ -126,7 +130,7 @@ function render() {
   let rows = players.map((p) => ({ p, score: buildScore(p, b.punt) }))
     .filter(({ p }) => (!q || (p.name + ' ' + p.team).toLowerCase().includes(q)) && (!pf || p.pos.includes(pf)) &&
       !(hideT && takenSet.has(p.id)) && !(hideM && mineSet.has(p.id)));
-  const val = (x) => sortKey === 'score' ? x.score : sortKey === 'name' ? x.p.name : sortKey === 'total' ? x.p.total : x.p.z[sortKey];
+  const val = (x) => sortKey === 'score' ? x.score : sortKey === 'name' ? x.p.name : sortKey === 'total' ? x.p.total : S.view === 'stat' ? statVal(x.p, sortKey) : x.p.z[sortKey];
   rows.sort((a, c) => (val(a) > val(c) ? 1 : val(a) < val(c) ? -1 : 0) * sortDir);
   const head = `<tr><th class="l">Mine</th><th>✗</th><th class="l" data-k="name">Player</th><th class="l">Pos</th><th class="l">Tm</th>` +
     CATS.map((c) => `<th data-k="${c.key}" class="${b.punt.includes(c.key) ? 'punt' : ''}">${c.label}</th>`).join('') +
@@ -136,7 +140,7 @@ function render() {
     `<td class="l"><input type="checkbox" data-mine="${esc(p.id)}" ${mineSet.has(p.id) ? 'checked' : ''}></td>` +
     `<td><input type="checkbox" data-taken="${esc(p.id)}" ${takenSet.has(p.id) ? 'checked' : ''}></td>` +
     `<td class="l">${esc(p.name)}</td><td class="l">${esc(p.pos)}</td><td class="l">${esc(p.team)}</td>` +
-    CATS.map((c) => `<td class="${cls(p.z[c.key])} ${b.punt.includes(c.key) ? 'punt' : ''}">${fmt(p.z[c.key])}</td>`).join('') +
+    CATS.map((c) => `<td class="${cls(p.z[c.key])} ${b.punt.includes(c.key) ? 'punt' : ''}">${cell(p, c.key)}</td>`).join('') +
     `<td><b>${fmt(score)}</b></td><td class="mut">${fmt(p.total)}</td></tr>`).join('');
 
   // team totals
@@ -181,6 +185,8 @@ document.addEventListener('click', (e) => {
 ['search', 'posf', 'hideTaken', 'hideMine'].forEach((id) => $(id).addEventListener('input', render));
 $('build').innerHTML = BUILDS.map((b) => `<option value="${b.id}">${b.name}</option>`).join('');
 $('build').value = S.build;
+$('view').value = S.view;
+$('view').onchange = () => { S.view = $('view').value; save(); render(); };
 $('build').onchange = () => { S.build = $('build').value; save(); render(); };
 const setPool = () => { S.teams = +$('teams').value || 12; S.spots = +$('spots').value || 13; save(); load(); render(); };
 $('teams').value = S.teams; $('spots').value = S.spots; $('teams').onchange = $('spots').onchange = setPool;
