@@ -48,11 +48,16 @@ var best=null;
   if(/PLAYER/i.test(x)&&/FG%/.test(x)&&/REB/i.test(x)&&(!best||t.rows.length>best.rows.length))best=t;
 });
 if(!best){alert('Could not find the projections table on this page. Open the NBA projections page first.');return;}
-var out=[].map.call(best.rows,function(r){
-  return [].map.call(r.cells,function(c){return c.innerText.replace(/\s+/g,' ').trim();}).join('\t');
-}).filter(function(l){return l.replace(/\t/g,'').trim();}).join('\n');
-var n=out.split('\n').length-1;
-function done(){alert('Copied '+n+' players. Now paste them into the draft app.');}
+var all=[].map.call(best.rows,function(r){
+  return {v:r.getClientRects().length>0,t:[].map.call(r.cells,function(c){return c.innerText.replace(/\s+/g,' ').trim();}).join('\t')};
+}).filter(function(o){return o.t.replace(/\t/g,'').trim();});
+var hidden=all.filter(function(o){return !o.v;}).length;
+var lines=all.filter(function(o){return o.v;}).map(function(o){return o.t;});
+var head=lines[0],rep=0;
+lines=lines.filter(function(l,i){if(i>0&&l===head){rep++;return false;}return true;});
+var out=lines.join('\n');
+var n=lines.length-1;
+function done(){alert('Copied '+n+' players'+(hidden||rep?' (skipped '+hidden+' hidden rows, '+rep+' repeated header rows)':'')+'. Now paste them into the draft app.');}
 function fallback(){
   var a=document.createElement('textarea');a.value=out;a.style.position='fixed';a.style.top='0';
   document.body.appendChild(a);a.select();

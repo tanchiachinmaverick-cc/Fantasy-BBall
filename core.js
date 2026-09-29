@@ -147,6 +147,9 @@
         stl: g('stl') || 0, blk: g('blk') || 0, to: g('to') || 0,
       });
     }
+    const seen = new Set(); let dups = 0;
+    for (const p of players) { if (seen.has(p.id)) dups++; seen.add(p.id); }
+    if (dups) warnings.push(dups + ' duplicate player rows (same name + team) found — ticking one will tick its duplicates.');
     if (players.length && players.every((p) => !p.pts && !p.reb && !p.ast))
       warnings.unshift('ERROR: every stat read as 0 — the columns did not line up. Paste the first rows to the developer.');
     if (estimated)

@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Punt Draft Assistant</title>
 <style>
-  :root { --bg:#f6f7f9; --card:#fff; --fg:#1b1f24; --mut:#6a737d; --line:#dfe3e8; --acc:#2456d6; --good:#1a7f37; --bad:#c62828; --mine:#e6f0ff; --taken:#eee; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#0f1216; --card:#181c22; --fg:#e6e9ed; --mut:#93a0ad; --line:#2a313a; --acc:#6c93ff; --good:#4cc26b; --bad:#ff6b6b; --mine:#1b2b4d; --taken:#22272e; } }
+  :root { --bg:#f6f7f9; --card:#fff; --fg:#1b1f24; --mut:#6a737d; --line:#dfe3e8; --acc:#2456d6; --good:#1a7f37; --bad:#c62828; --mine:#e6f0ff; --taken:#eee; --warnbg:#fff4d6; --warnfg:#5c4400; --errbg:#ffe2e2; --errfg:#7a1414; color-scheme:light; }
+  :root[data-theme=dark] { --bg:#0f1216; --card:#181c22; --fg:#e6e9ed; --mut:#93a0ad; --line:#2a313a; --acc:#6c93ff; --good:#4cc26b; --bad:#ff6b6b; --mine:#1b2b4d; --taken:#22272e; --warnbg:#3a2f0b; --warnfg:#f2d98a; --errbg:#4a1a1a; --errfg:#ffb4b4; color-scheme:dark; }
   * { box-sizing: border-box; }
   body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.4 system-ui,sans-serif; }
   header { padding:12px 16px; border-bottom:1px solid var(--line); background:var(--card); display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
@@ -20,8 +20,8 @@
   input[type=number] { width:64px; }
   .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px; }
   .mut { color:var(--mut); } .small { font-size:12px; }
-  .warn { background:#fff4d6; color:#5c4400; border-radius:6px; padding:6px 9px; margin:6px 0; font-size:12px; }
-  .banner { background:#ffe2e2; color:#7a1414; border-radius:6px; padding:6px 9px; margin:0 0 8px; font-size:12px; }
+  .warn { background:var(--warnbg); color:var(--warnfg); border-radius:6px; padding:6px 9px; margin:6px 0; font-size:12px; }
+  .banner { background:var(--errbg); color:var(--errfg); border-radius:6px; padding:6px 9px; margin:0 0 8px; font-size:12px; }
   .tblwrap { max-height:74vh; overflow:auto; border:1px solid var(--line); border-radius:6px; }
   table { border-collapse:collapse; width:100%; font-size:12.5px; }
   th, td { padding:3px 6px; text-align:right; white-space:nowrap; border-bottom:1px solid var(--line); }
@@ -41,6 +41,7 @@
 <header>
   <h1>Punt Draft Assistant</h1>
   <label>Build <select id="build"></select></label>
+  <label>Theme <select id="theme"><option value="auto">Auto</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
   <label>Show <select id="view"><option value="stat">Actual stats</option><option value="z">Strength (z-score)</option></select></label>
   <label>Teams <input type="number" id="teams" min="4" max="30" value="12"></label>
   <label>Roster spots <input type="number" id="spots" min="5" max="20" value="13"></label>
@@ -80,7 +81,7 @@
 const { CATS, CAT_KEYS, BUILDS, parseProjections, computeZ, rosterTotals, buildScore, recommend, buildFit } = FB;
 const $ = (id) => document.getElementById(id);
 const LS = 'punt-draft-v1';
-let S = { text: '', sample: false, mine: [], taken: [], build: 'balanced', view: 'stat', teams: 12, spots: 13 };
+let S = { text: '', sample: false, mine: [], taken: [], build: 'balanced', view: 'stat', theme: 'auto', teams: 12, spots: 13 };
 try { Object.assign(S, JSON.parse(localStorage.getItem(LS) || '{}')); } catch (e) {}
 const save = () => { try { localStorage.setItem(LS, JSON.stringify(S)); } catch (e) {} };
 
@@ -186,6 +187,11 @@ document.addEventListener('click', (e) => {
 $('build').innerHTML = BUILDS.map((b) => `<option value="${b.id}">${b.name}</option>`).join('');
 $('build').value = S.build;
 $('view').value = S.view;
+const mq = window.matchMedia('(prefers-color-scheme: dark)');
+const applyTheme = () => document.documentElement.setAttribute('data-theme', S.theme === 'auto' ? (mq.matches ? 'dark' : 'light') : S.theme);
+mq.addEventListener && mq.addEventListener('change', applyTheme);
+$('theme').value = S.theme; applyTheme();
+$('theme').onchange = () => { S.theme = $('theme').value; save(); applyTheme(); };
 $('view').onchange = () => { S.view = $('view').value; save(); render(); };
 $('build').onchange = () => { S.build = $('build').value; save(); render(); };
 const setPool = () => { S.teams = +$('teams').value || 12; S.spots = +$('spots').value || 13; save(); load(); render(); };
