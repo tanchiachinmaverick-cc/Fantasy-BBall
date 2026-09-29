@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Punt Draft Assistant</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --fg:#1b1f24; --mut:#6a737d; --line:#dfe3e8; --acc:#2456d6; --good:#1a7f37; --bad:#c62828; --mine:#e6f0ff; --taken:#eee; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0f1216; --card:#181c22; --fg:#e6e9ed; --mut:#93a0ad; --line:#2a313a; --acc:#6c93ff; --good:#4cc26b; --bad:#ff6b6b; --mine:#1b2b4d; --taken:#22272e; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.4 system-ui,sans-serif; }
+  header { padding:12px 16px; border-bottom:1px solid var(--line); background:var(--card); display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  h1 { font-size:17px; margin:0 12px 0 0; }
+  main { display:grid; grid-template-columns:minmax(0,1.6fr) minmax(320px,1fr); gap:12px; padding:12px; align-items:start; }
+  @media (max-width:900px) { main { grid-template-columns:1fr; } }
+  section { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px; }
+  h2 { font-size:14px; margin:0 0 8px; }
+  button, select, input, textarea { font:inherit; color:inherit; background:var(--card); border:1px solid var(--line); border-radius:6px; padding:5px 9px; }
+  button { cursor:pointer; } button:hover { border-color:var(--acc); }
+  input[type=number] { width:64px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px; }
+  .mut { color:var(--mut); } .small { font-size:12px; }
+  .warn { background:#fff4d6; color:#5c4400; border-radius:6px; padding:6px 9px; margin:6px 0; font-size:12px; }
+  .banner { background:#ffe2e2; color:#7a1414; border-radius:6px; padding:6px 9px; margin:0 0 8px; font-size:12px; }
+  .tblwrap { max-height:74vh; overflow:auto; border:1px solid var(--line); border-radius:6px; }
+  table { border-collapse:collapse; width:100%; font-size:12.5px; }
+  th, td { padding:3px 6px; text-align:right; white-space:nowrap; border-bottom:1px solid var(--line); }
+  th { position:sticky; top:0; background:var(--card); cursor:pointer; z-index:1; }
+  th.l, td.l { text-align:left; }
+  tr.mine td { background:var(--mine); } tr.taken td { background:var(--taken); color:var(--mut); text-decoration:line-through; }
+  .pos { color:var(--good); } .neg { color:var(--bad); } .punt { opacity:.35; }
+  .rec { border:1px solid var(--line); border-radius:6px; padding:6px 8px; margin-bottom:6px; display:flex; justify-content:space-between; gap:8px; align-items:center; }
+  .chip { display:inline-block; font-size:11px; padding:0 5px; border-radius:8px; background:var(--mine); margin-right:3px; }
+  .bar { display:flex; align-items:center; gap:6px; margin:2px 0; } .bar b { width:38px; }
+  .bar i { display:block; height:8px; border-radius:4px; }
+  textarea { width:100%; height:120px; font-family:monospace; font-size:12px; }
+  details { margin-bottom:8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Punt Draft Assistant</h1>
+  <label>Build <select id="build"></select></label>
+  <label>Teams <input type="number" id="teams" min="4" max="30" value="12"></label>
+  <label>Roster spots <input type="number" id="spots" min="5" max="20" value="13"></label>
+  <span class="mut small" id="counts"></span>
+</header>
+<main>
+  <section>
+    <div id="sampleBanner" class="banner" hidden>Showing SYNTHETIC sample players — not real projections. Import real data below.</div>
+    <details id="importBox" open>
+      <summary><b>Import projections</b></summary>
+      <p class="small mut">On hashtagbasketball.com, open the NBA projections page, select the table and copy it (or export CSV), then paste here. Needs a PLAYER column plus FG%, FT%, 3PM, PTS, REB (TREB), AST, STL, BLK, TO. FGA/FTA columns improve accuracy. The site's exact layout could not be verified when this was built, so check the warnings shown after import.</p>
+      <textarea id="paste" placeholder="Paste tab- or comma-separated table here"></textarea>
+      <div class="row"><button id="doImport">Import</button> <input type="file" id="file" accept=".csv,.tsv,.txt"> <button id="doSample">Load synthetic sample</button> <button id="reset">Clear picks</button></div>
+      <div id="warns"></div>
+    </details>
+    <div class="row">
+      <input id="search" placeholder="Search name/team" style="flex:1;min-width:140px">
+      <label>Pos <select id="posf"><option value="">All</option><option>PG</option><option>SG</option><option>SF</option><option>PF</option><option>C</option></select></label>
+      <label><input type="checkbox" id="hideTaken" checked> hide taken</label>
+      <label><input type="checkbox" id="hideMine"> hide mine</label>
+    </div>
+    <div class="tblwrap"><table id="tbl"></table></div>
+    <p class="small mut">☑ = on my team · ✗ = taken by someone else. z-scores are vs. the top (teams × spots) players; FG%/FT% use volume-weighted impact. TO z is inverted (positive = fewer turnovers).</p>
+  </section>
+  <section>
+    <h2>My team (<span id="myn">0</span>)</h2>
+    <div id="team"></div>
+    <h2 style="margin-top:14px">Best next picks for <span id="bname"></span></h2>
+    <div id="recs"></div>
+    <h2 style="margin-top:14px">Which build fits my roster?</h2>
+    <div id="fit"></div>
+    <p class="small mut">Fit = sum of my roster's z over the build's non-punted categories. Recommendations weight categories where your roster lags up to +50%; that weighting is a heuristic, not a proven optimum.</p>
+  </section>
+</main>
+<script src="core.js"></script>
+<script>
+const { CATS, CAT_KEYS, BUILDS, parseProjections, computeZ, rosterTotals, buildScore, recommend, buildFit } = FB;
+const $ = (id) => document.getElementById(id);
+const LS = 'punt-draft-v1';
+let S = { text: '', sample: false, mine: [], taken: [], build: 'balanced', teams: 12, spots: 13 };
+try { Object.assign(S, JSON.parse(localStorage.getItem(LS) || '{}')); } catch (e) {}
+const save = () => { try { localStorage.setItem(LS, JSON.stringify(S)); } catch (e) {} };
+
+let players = [], warnings = [], sortKey = 'score', sortDir = -1;
+
+function synthSample() {
+  let seed = 7; const r = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const pos = ['PG','SG','SF','PF','C'];
+  const rows = ['PLAYER\tPOS\tTEAM\tFG%\tFGA\tFT%\tFTA\t3PM\tPTS\tREB\tAST\tSTL\tBLK\tTO'];
+  for (let i = 1; i <= 200; i++) {
+    const q = 1 - i / 260, p = pos[Math.floor(r() * 5)], big = p === 'C' || p === 'PF', guard = p === 'PG' || p === 'SG';
+    const fga = 6 + 14 * q * (0.6 + r() * 0.6), fta = 1 + 6 * q * r() * (big ? 1.4 : 1);
+    rows.push([`Sample Player ${String(i).padStart(3, '0')}`, p, 'SYN',
+      (0.40 + 0.12 * r() + (big ? 0.06 : 0)).toFixed(3), fga.toFixed(1), (0.60 + 0.3 * r() - (big ? 0.06 : 0)).toFixed(3), fta.toFixed(1),
+      (3.2 * q * r() * (guard ? 1.6 : 0.5)).toFixed(1), (8 + 20 * q * (0.7 + r() * 0.5)).toFixed(1), ((big ? 9 : 4) * q * (0.6 + r() * 0.8)).toFixed(1),
+      ((guard ? 6 : 2) * q * (0.4 + r() * 1.0)).toFixed(1), (1.4 * q * (0.4 + r())).toFixed(1), ((big ? 1.6 : 0.5) * q * (0.3 + r() * 1.3)).toFixed(1),
+      (1 + 2.6 * q * (0.5 + r())).toFixed(1)].join('\t'));
+  }
+  return rows.join('\n');
+}
+
+function load() {
+  const res = parseProjections(S.text);
+  players = res.players; warnings = res.warnings;
+  computeZ(players, S.teams * S.spots);
+}
+
+const fmt = (z) => (z >= 0 ? '+' : '') + z.toFixed(1);
+const cls = (z) => (z >= 1 ? 'pos' : z <= -1 ? 'neg' : '');
+const build = () => BUILDS.find((b) => b.id === S.build) || BUILDS[0];
+
+function render() {
+  const b = build(), mineSet = new Set(S.mine), takenSet = new Set(S.taken);
+  const mine = players.filter((p) => mineSet.has(p.id));
+  const avail = players.filter((p) => !mineSet.has(p.id) && !takenSet.has(p.id));
+  $('counts').textContent = `${players.length} players · ${mine.length}/${S.spots} picked · ${S.taken.length} taken`;
+  $('sampleBanner').hidden = !S.sample;
+  $('warns').innerHTML = warnings.map((w) => `<div class="warn">${w}</div>`).join('');
+  $('myn').textContent = mine.length; $('bname').textContent = b.name;
+
+  // player table
+  const q = $('search').value.trim().toLowerCase(), pf = $('posf').value;
+  const hideT = $('hideTaken').checked, hideM = $('hideMine').checked;
+  let rows = players.map((p) => ({ p, score: buildScore(p, b.punt) }))
+    .filter(({ p }) => (!q || (p.name + ' ' + p.team).toLowerCase().includes(q)) && (!pf || p.pos.includes(pf)) &&
+      !(hideT && takenSet.has(p.id)) && !(hideM && mineSet.has(p.id)));
+  const val = (x) => sortKey === 'score' ? x.score : sortKey === 'name' ? x.p.name : sortKey === 'total' ? x.p.total : x.p.z[sortKey];
+  rows.sort((a, c) => (val(a) > val(c) ? 1 : val(a) < val(c) ? -1 : 0) * sortDir);
+  const head = `<tr><th class="l">Mine</th><th>✗</th><th class="l" data-k="name">Player</th><th class="l">Pos</th><th class="l">Tm</th>` +
+    CATS.map((c) => `<th data-k="${c.key}" class="${b.punt.includes(c.key) ? 'punt' : ''}">${c.label}</th>`).join('') +
+    `<th data-k="score">Build</th><th data-k="total">All</th></tr>`;
+  $('tbl').innerHTML = head + rows.slice(0, 400).map(({ p, score }) =>
+    `<tr class="${mineSet.has(p.id) ? 'mine' : takenSet.has(p.id) ? 'taken' : ''}">` +
+    `<td class="l"><input type="checkbox" data-mine="${esc(p.id)}" ${mineSet.has(p.id) ? 'checked' : ''}></td>` +
+    `<td><input type="checkbox" data-taken="${esc(p.id)}" ${takenSet.has(p.id) ? 'checked' : ''}></td>` +
+    `<td class="l">${esc(p.name)}</td><td class="l">${esc(p.pos)}</td><td class="l">${esc(p.team)}</td>` +
+    CATS.map((c) => `<td class="${cls(p.z[c.key])} ${b.punt.includes(c.key) ? 'punt' : ''}">${fmt(p.z[c.key])}</td>`).join('') +
+    `<td><b>${fmt(score)}</b></td><td class="mut">${fmt(p.total)}</td></tr>`).join('');
+
+  // team totals
+  const t = rosterTotals(mine), max = Math.max(3, ...CAT_KEYS.map((k) => Math.abs(t[k])));
+  $('team').innerHTML = mine.length ? CATS.map((c) => {
+    const v = t[c.key], w = Math.abs(v) / max * 100;
+    return `<div class="bar ${b.punt.includes(c.key) ? 'punt' : ''}"><b>${c.label}</b><i style="width:${w}%;background:var(${v >= 0 ? '--good' : '--bad'})"></i><span class="small">${fmt(v)}</span></div>`;
+  }).join('') + `<div class="small mut">Roster: ${mine.map((p) => esc(p.name)).join(', ')}</div>` : '<span class="mut">Check players as you draft them.</span>';
+
+  // recommendations
+  const recs = recommend(avail, mine, b.punt, 10);
+  $('recs').innerHTML = recs.map(({ player: p, score }) =>
+    `<div class="rec"><div><b>${esc(p.name)}</b> <span class="mut small">${esc(p.pos)} ${esc(p.team)}</span><br>` +
+    CATS.filter((c) => !b.punt.includes(c.key) && p.z[c.key] >= 1).map((c) => `<span class="chip">${c.label} ${fmt(p.z[c.key])}</span>`).join('') +
+    `</div><div><button data-pick="${esc(p.id)}">Draft</button> <button data-take="${esc(p.id)}">Taken</button></div></div>`).join('') || '<span class="mut">No data.</span>';
+
+  // build fit
+  $('fit').innerHTML = mine.length ? buildFit(mine).slice(0, 6).map(({ build: bb, fit }) =>
+    `<div class="small"><a href="#" data-build="${bb.id}">${bb.name}</a> <span class="mut">${fmt(fit)}</span></div>`).join('') : '<span class="mut">Pick a few players first.</span>';
+}
+
+function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+const toggle = (arr, id, on) => { const s = new Set(arr); on ? s.add(id) : s.delete(id); return [...s]; };
+
+document.addEventListener('change', (e) => {
+  const d = e.target.dataset;
+  if (d.mine != null) { S.mine = toggle(S.mine, d.mine, e.target.checked); if (e.target.checked) S.taken = toggle(S.taken, d.mine, false); }
+  else if (d.taken != null) { S.taken = toggle(S.taken, d.taken, e.target.checked); if (e.target.checked) S.mine = toggle(S.mine, d.taken, false); }
+  else return;
+  save(); render();
+});
+document.addEventListener('click', (e) => {
+  const d = e.target.dataset;
+  if (d.pick) { S.mine = toggle(S.mine, d.pick, true); S.taken = toggle(S.taken, d.pick, false); }
+  else if (d.take) { S.taken = toggle(S.taken, d.take, true); }
+  else if (d.build) { e.preventDefault(); S.build = d.build; $('build').value = d.build; }
+  else if (e.target.tagName === 'TH' && e.target.dataset.k) {
+    const k = e.target.dataset.k; sortDir = sortKey === k ? -sortDir : (k === 'name' ? 1 : -1); sortKey = k; render(); return;
+  } else return;
+  save(); render();
+});
+['search', 'posf', 'hideTaken', 'hideMine'].forEach((id) => $(id).addEventListener('input', render));
+$('build').innerHTML = BUILDS.map((b) => `<option value="${b.id}">${b.name}</option>`).join('');
+$('build').value = S.build;
+$('build').onchange = () => { S.build = $('build').value; save(); render(); };
+const setPool = () => { S.teams = +$('teams').value || 12; S.spots = +$('spots').value || 13; save(); load(); render(); };
+$('teams').value = S.teams; $('spots').value = S.spots; $('teams').onchange = $('spots').onchange = setPool;
+function importText(text, sample) {
+  S.text = text; S.sample = sample; S.mine = []; S.taken = []; save(); load(); render();
+  if (players.length) $('importBox').open = false;
+}
+$('doImport').onclick = () => importText($('paste').value, false);
+$('file').onchange = async (e) => { if (e.target.files[0]) importText(await e.target.files[0].text(), false); };
+$('doSample').onclick = () => importText(synthSample(), true);
+$('reset').onclick = () => { if (confirm('Clear all picks and taken marks?')) { S.mine = []; S.taken = []; save(); render(); } };
+
+if (!S.text) { S.text = synthSample(); S.sample = true; }
+load(); render();
+</script>
+</body>
+</html>
