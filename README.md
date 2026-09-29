@@ -17,4 +17,6 @@ The importer was written without access to the live site's markup, so verify wit
   your roster's total in that cat lags your active-cat average (heuristic).
 - Ignores position/roster-slot constraints, injuries, and ADP/draft-position value.
 
+One-click copy: open `bookmarklet.html` for the setup steps (copies the table from the projections page you are viewing).
+
 Tests: `node --test core.test.js`

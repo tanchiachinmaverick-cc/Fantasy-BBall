@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Copy-table bookmark</title>
+<style>
+  body { font:16px/1.5 system-ui,sans-serif; max-width:720px; margin:24px auto; padding:0 16px; color:#1b1f24; background:#fff; }
+  @media (prefers-color-scheme: dark) { body { color:#e6e9ed; background:#0f1216; } a.bm { background:#6c93ff !important; color:#000 !important; } }
+  a.bm { display:inline-block; padding:8px 14px; background:#2456d6; color:#fff; border-radius:8px; text-decoration:none; font-weight:600; }
+  textarea { width:100%; height:110px; font-family:monospace; font-size:12px; }
+  .note { font-size:14px; opacity:.8; }
+</style>
+</head>
+<body>
+<h1>Copy-table bookmark</h1>
+<p>This adds a button to your browser. Click it while you are on the Hashtag Basketball projections page and it copies the projections table to your clipboard, ready to paste into the draft app. It only reads the page you are looking at and sends nothing anywhere.</p>
+
+<h2>Step 1 – Show your bookmarks bar</h2>
+<p>Chrome / Edge: press <b>Ctrl+Shift+B</b> (Windows) or <b>Cmd+Shift+B</b> (Mac). Safari: View menu → Show Favorites Bar.</p>
+
+<h2>Step 2 – Drag this button up to the bookmarks bar</h2>
+<p><a class="bm" id="bm" href="#">Copy HB table</a></p>
+<p class="note">If dragging does not work, use the manual method below.</p>
+
+<h2>Step 3 – Use it</h2>
+<ol>
+  <li>Go to the NBA projections page on hashtagbasketball.com and wait for the table to load.</li>
+  <li>Click <b>Copy HB table</b> in your bookmarks bar. A message says how many players were copied.</li>
+  <li>Open the draft app, click in the import box, paste (Ctrl+V / Cmd+V) and click <b>Import</b>.</li>
+</ol>
+
+<h2>Manual method (if dragging fails)</h2>
+<ol>
+  <li>Click the box below and press Ctrl+A then Ctrl+C to copy all the code.</li>
+  <li>Right-click the bookmarks bar → <b>Add page</b> (or Add bookmark). Name it <b>Copy HB table</b>, paste the code into the URL field, and save.</li>
+</ol>
+<textarea id="code" readonly onclick="this.select()"></textarea>
+
+<p class="note">If the site is paginated or filtered, the bookmark copies only the rows currently shown. If it says it cannot find the table, or the site blocks bookmarks, select and copy the table by hand as before.</p>
+
+<script id="src" type="text/plain">
+(function(){
+var best=null;
+[].slice.call(document.querySelectorAll('table')).forEach(function(t){
+  if(t.querySelector('table'))return;
+  var x=t.innerText||'';
+  if(/PLAYER/i.test(x)&&/FG%/.test(x)&&/REB/i.test(x)&&(!best||t.rows.length>best.rows.length))best=t;
+});
+if(!best){alert('Could not find the projections table on this page. Open the NBA projections page first.');return;}
+var out=[].map.call(best.rows,function(r){
+  return [].map.call(r.cells,function(c){return c.innerText.replace(/\s+/g,' ').trim();}).join('\t');
+}).filter(function(l){return l.replace(/\t/g,'').trim();}).join('\n');
+var n=out.split('\n').length-1;
+function done(){alert('Copied '+n+' players. Now paste them into the draft app.');}
+function fallback(){
+  var a=document.createElement('textarea');a.value=out;a.style.position='fixed';a.style.top='0';
+  document.body.appendChild(a);a.select();
+  var ok=false;try{ok=document.execCommand('copy');}catch(e){}
+  document.body.removeChild(a);
+  if(ok)done();else prompt('Copy this text (Ctrl+A then Ctrl+C):',out);
+}
+if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(out).then(done,fallback);else fallback();
+})();
+</script>
+<script>
+  const code = document.getElementById('src').textContent.trim();
+  const url = 'javascript:' + encodeURIComponent(code);
+  document.getElementById('bm').href = url;
+  document.getElementById('code').value = url;
+</script>
+</body>
+</html>
